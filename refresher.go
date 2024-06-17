@@ -201,8 +201,10 @@ func (r *refresher[T]) updateValue(newValue *Refreshable[T], refreshAt time.Time
 func (r *refresher[T]) refresh(ctx context.Context) error {
 	newValue, err := r.refreshFunc(ctx)
 	if err != nil {
+		go r.onRefreshFailure(err)
 		return err
 	}
+	go r.onRefreshSuccess(newValue)
 	r.updateValue(newValue, r.refreshStrategy.GetRefreshAt(newValue))
 	return nil
 }
@@ -231,6 +233,8 @@ func (r *refresher[T]) start(ctx context.Context) {
 		if err != nil {
 			go r.onStorageReadFailure(err)
 		} else {
+			go r.onStorageReadSuccess(valueFromStorage)
+
 			refreshAt := r.refreshStrategy.GetRefreshAt(valueFromStorage)
 
 			// if the value is still fresh, we use it
@@ -258,31 +262,31 @@ func (r *refresher[T]) start(ctx context.Context) {
 		case <-refreshTimer.C:
 			if err := r.refresh(ctx); err != nil {
 				refreshTimer.Reset(r.retryDelay)
-				go r.onRefreshFailure(err)
 				continue
 			}
 			nextRefreshIn := time.Until(r.GetNextRefreshTime())
 			refreshTimer.Reset(nextRefreshIn)
 			newValue := r.GetCurrent()
-			go r.onRefreshSuccess(newValue)
 			go r.store(ctx, newValue)
 		}
 	}
 }
 
 func defaultRefreshStrategyFunc[T any](refreshable *Refreshable[T]) time.Time {
+	now := time.Now()
+
 	// if value is already expired, refresh now
-	if time.Now().After(refreshable.ExpiresAt) {
-		return time.Now()
+	if now.After(refreshable.ExpiresAt) {
+		return now
 	}
 
-	lifetimeSoFarSeconds := time.Since(refreshable.IssuedAt).Seconds()
+	lifetimeSoFarSeconds := now.Sub(refreshable.IssuedAt).Seconds()
 	lifetimeTotalSeconds := refreshable.ExpiresAt.Sub(refreshable.IssuedAt).Seconds()
 	twoThirdsOfTotalLifetimeSeconds := lifetimeTotalSeconds * 2 / 3
 
 	// already exceeded 66% of lifetime, refresh now
 	if lifetimeSoFarSeconds > twoThirdsOfTotalLifetimeSeconds {
-		return time.Now()
+		return now
 	}
 
 	// otherwise refresh at 66% of its lifetime
