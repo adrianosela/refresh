@@ -55,19 +55,19 @@ func WithStorage[T any](storage Storage[T]) Option[T] {
 }
 
 // WithOnRefreshSuccess is the refresher Option to set a callback function to be fired
-// after a succesful refreshing of the Refreshable.
+// after a successful refreshing of the Refreshable.
 func WithOnRefreshSuccess[T any](onRefreshSuccess func(*Refreshable[T])) Option[T] {
 	return func(r *refresher[T]) { r.onRefreshSuccess = onRefreshSuccess }
 }
 
 // WithOnStorageReadSuccess is the refresher Option to set a callback function to be fired
-// after a succesful reading of the Refreshable from storage.
+// after a successful reading of the Refreshable from storage.
 func WithOnStorageReadSuccess[T any](onStorageReadSuccess func(*Refreshable[T])) Option[T] {
 	return func(r *refresher[T]) { r.onStorageReadSuccess = onStorageReadSuccess }
 }
 
 // WithOnStorageWriteSuccess is the refresher Option to set a callback function to be fired
-// after a succesful writing of the Refreshable to storage.
+// after a successful writing of the Refreshable to storage.
 func WithOnStorageWriteSuccess[T any](onStorageWriteSuccess func(*Refreshable[T])) Option[T] {
 	return func(r *refresher[T]) { r.onStorageWriteSuccess = onStorageWriteSuccess }
 }
