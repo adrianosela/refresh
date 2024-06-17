@@ -209,7 +209,7 @@ func (r *refresher[T]) refresh(ctx context.Context) error {
 
 // store attempts to store the current value in Storage.
 func (r *refresher[T]) store(ctx context.Context, refreshable *Refreshable[T]) {
-	if r.storage != nil {
+	if r.storage == nil {
 		return
 	}
 	if err := r.storage.Put(ctx, refreshable); err != nil {
