@@ -218,6 +218,7 @@ func (r *refresher[T]) store(ctx context.Context, refreshable *Refreshable[T]) {
 		go r.onStorageWriteFailure(err)
 		return
 	}
+	go r.onStorageWriteSuccess(refreshable)
 }
 
 // start is a long-lived routine which takes care of periodically
