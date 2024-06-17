@@ -9,6 +9,10 @@ type RefreshStrategy[T any] interface {
 	GetRefreshAt(refreshable *Refreshable[T]) time.Time
 }
 
+// RefreshAtFunc returns the time at which a Refreshable should be refreshed.
+// Any errors must be handled internally such that a valid time is returned.
+type RefreshAtFunc[T any] func(refreshable *Refreshable[T]) time.Time
+
 // refreshStrategy is a RefreshStrategy which runs an inner
 // function to determine the refresh time for a refreshable value.
 type refreshStrategy[T any] struct {
