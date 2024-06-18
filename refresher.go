@@ -214,6 +214,7 @@ func (r *refresher[T]) store(ctx context.Context, refreshable *Refreshable[T]) {
 	if r.storage == nil {
 		return
 	}
+
 	if err := r.storage.Put(ctx, refreshable); err != nil {
 		go r.onStorageWriteFailure(err)
 		return
@@ -248,10 +249,15 @@ func (r *refresher[T]) start(ctx context.Context) {
 
 	// if the refresher has no value at this point, we need a fresh one.
 	if r.GetCurrent() == nil {
-		r.initializationResult <- r.refresh(ctx)
+		if err := r.refresh(ctx); err != nil {
+			r.initializationResult <- err
+		} else {
+			r.initializationResult <- nil
+			go r.store(ctx, r.GetCurrent())
+		}
 	}
 
-	close(r.initializationResult) // channel is useless after the first write
+	close(r.initializationResult) // channel is useless at this point
 
 	refreshTimer := time.NewTimer(time.Until(r.GetNextRefreshTime()))
 	defer refreshTimer.Stop()
@@ -265,10 +271,8 @@ func (r *refresher[T]) start(ctx context.Context) {
 				refreshTimer.Reset(r.retryDelay)
 				continue
 			}
-			nextRefreshIn := time.Until(r.GetNextRefreshTime())
-			refreshTimer.Reset(nextRefreshIn)
-			newValue := r.GetCurrent()
-			go r.store(ctx, newValue)
+			refreshTimer.Reset(time.Until(r.GetNextRefreshTime()))
+			go r.store(ctx, r.GetCurrent())
 		}
 	}
 }
