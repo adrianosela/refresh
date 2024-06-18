@@ -56,13 +56,13 @@ func WithStorage[T any](storage Storage[T]) Option[T] {
 
 // WithOnRefreshSuccess is the refresher Option to set a callback function to be fired
 // after a successful refreshing of the Refreshable.
-func WithOnRefreshSuccess[T any](onRefreshSuccess func(*Refreshable[T])) Option[T] {
+func WithOnRefreshSuccess[T any](onRefreshSuccess func(*Refreshable[T], time.Time)) Option[T] {
 	return func(r *refresher[T]) { r.onRefreshSuccess = onRefreshSuccess }
 }
 
 // WithOnStorageReadSuccess is the refresher Option to set a callback function to be fired
 // after a successful reading of the Refreshable from storage.
-func WithOnStorageReadSuccess[T any](onStorageReadSuccess func(*Refreshable[T])) Option[T] {
+func WithOnStorageReadSuccess[T any](onStorageReadSuccess func(*Refreshable[T], time.Time)) Option[T] {
 	return func(r *refresher[T]) { r.onStorageReadSuccess = onStorageReadSuccess }
 }
 
@@ -111,8 +111,8 @@ type refresher[T any] struct {
 	storage Storage[T]
 
 	// event handlers
-	onRefreshSuccess      func(*Refreshable[T])
-	onStorageReadSuccess  func(*Refreshable[T])
+	onRefreshSuccess      func(*Refreshable[T], time.Time)
+	onStorageReadSuccess  func(*Refreshable[T], time.Time)
 	onStorageWriteSuccess func(*Refreshable[T])
 	onRefreshFailure      func(error)
 	onStorageReadFailure  func(error)
@@ -133,8 +133,8 @@ func NewRefresher[T any](refreshFunc RefreshFunc[T], opts ...Option[T]) Refreshe
 		refreshStrategy: RefreshStrategyFromFunction(defaultRefreshStrategyFunc[T]),
 
 		// event handlers
-		onRefreshSuccess:      func(r *Refreshable[T]) { /* NOOP */ },
-		onStorageReadSuccess:  func(r *Refreshable[T]) { /* NOOP */ },
+		onRefreshSuccess:      func(r *Refreshable[T], refreshAt time.Time) { /* NOOP */ },
+		onStorageReadSuccess:  func(r *Refreshable[T], refreshAt time.Time) { /* NOOP */ },
 		onStorageWriteSuccess: func(r *Refreshable[T]) { /* NOOP */ },
 		onRefreshFailure:      func(err error) { /* NOOP */ },
 		onStorageReadFailure:  func(err error) { /* NOOP */ },
@@ -204,8 +204,9 @@ func (r *refresher[T]) refresh(ctx context.Context) error {
 		go r.onRefreshFailure(err)
 		return err
 	}
-	go r.onRefreshSuccess(newValue)
-	r.updateValue(newValue, r.refreshStrategy.GetRefreshAt(newValue))
+	nextRefreshAt := r.refreshStrategy.GetRefreshAt(newValue)
+	go r.onRefreshSuccess(newValue, nextRefreshAt)
+	r.updateValue(newValue, nextRefreshAt)
 	return nil
 }
 
@@ -235,14 +236,15 @@ func (r *refresher[T]) start(ctx context.Context) {
 		if err != nil {
 			go r.onStorageReadFailure(err)
 		} else {
-			go r.onStorageReadSuccess(valueFromStorage)
-
 			refreshAt := r.refreshStrategy.GetRefreshAt(valueFromStorage)
 
 			// if the value is still fresh, we use it
 			if time.Now().Before(refreshAt) {
+				go r.onStorageReadSuccess(valueFromStorage, refreshAt)
 				r.updateValue(valueFromStorage, refreshAt)
 				r.initializationResult <- nil
+			} else {
+				go r.onStorageReadSuccess(valueFromStorage, time.Now())
 			}
 		}
 	}
