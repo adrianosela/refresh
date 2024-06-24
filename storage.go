@@ -14,7 +14,7 @@ type Storage[T any] interface {
 	Put(context.Context, *Refreshable[T]) error
 }
 
-// refreshStrategy is a RefreshStrategy which runs inner
+// storage is a Storage which runs inner
 // functions to store and retrieve a Refreshable.
 type storage[T any] struct {
 	getFunc func(context.Context) (*Refreshable[T], error)
